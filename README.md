@@ -32,13 +32,21 @@ pip install moviepy
 Run the script without arguments and enter the folder path when prompted:
 
 ```bash
-python mp4_duration_calculator.py
+venv\Scripts\python.exe mp4_duration_calculator.py
 ```
 
 ### Method 2: Command Line Argument
 Provide the folder path as a command line argument:
 
 ```bash
+venv\Scripts\python.exe mp4_duration_calculator.py "C:\Users\YourName\Videos"
+```
+
+### Method 3: Using Activated Virtual Environment
+Alternatively, activate the virtual environment first:
+
+```bash
+venv\Scripts\Activate.ps1
 python mp4_duration_calculator.py "C:\Users\YourName\Videos"
 ```
 
