@@ -3,7 +3,8 @@
 MP4 Duration Calculator
 
 This script searches through all MP4 files in a specified folder and its subfolders,
-then calculates and displays the total duration of all videos combined.
+then calculates and displays the total duration of all videos combined, as well as
+the total duration within each subfolder.
 """
 
 import os
@@ -11,6 +12,7 @@ import sys
 from pathlib import Path
 from moviepy.editor import VideoFileClip
 import time
+from collections import defaultdict
 
 
 def format_duration(seconds):
@@ -82,6 +84,40 @@ def find_mp4_files(folder_path):
     return mp4_files
 
 
+def calculate_subfolder_durations(folder_path, mp4_files):
+    """Calculate duration totals for each subfolder"""
+    folder = Path(folder_path)
+    subfolder_totals = defaultdict(float)
+    subfolder_counts = defaultdict(int)
+    subfolder_files = defaultdict(list)
+    
+    for file_path in mp4_files:
+        relative_path = file_path.relative_to(folder)
+        # Get the subfolder (parent of the file)
+        subfolder = relative_path.parent
+        
+        # Use the subfolder name, or "Root" if it's in the main folder
+        subfolder_name = str(subfolder) if str(subfolder) != "." else "Root"
+        
+        # Get duration
+        result = get_video_duration(file_path)
+        if isinstance(result, tuple):
+            duration, _ = result
+        else:
+            duration = result
+            
+        if duration <= 0:
+            # Try alternative method
+            duration = get_video_duration_alternative(file_path)
+        
+        if duration > 0:
+            subfolder_totals[subfolder_name] += duration
+            subfolder_counts[subfolder_name] += 1
+            subfolder_files[subfolder_name].append((relative_path, duration))
+    
+    return subfolder_totals, subfolder_counts, subfolder_files
+
+
 def calculate_total_duration(folder_path):
     """Calculate the total duration of all MP4 files in the folder and subfolders"""
     print(f"Searching for MP4 files in: {folder_path}")
@@ -96,6 +132,9 @@ def calculate_total_duration(folder_path):
     
     print(f"Found {len(mp4_files)} MP4 file(s):")
     print()
+    
+    # Calculate subfolder durations first
+    subfolder_totals, subfolder_counts, subfolder_files = calculate_subfolder_durations(folder_path, mp4_files)
     
     total_duration = 0
     file_count = 0
@@ -129,9 +168,34 @@ def calculate_total_duration(folder_path):
                 print(f"    Skipped (could not read duration with any method)")
         print()
     
-    # Display results
+    # Display subfolder summaries
     print("=" * 50)
-    print("SUMMARY")
+    print("SUBFOLDER SUMMARIES")
+    print("=" * 50)
+    
+    # Sort subfolders alphabetically
+    sorted_subfolders = sorted(subfolder_totals.items(), key=lambda x: x[0])
+    
+    for subfolder_name, total_duration_subfolder in sorted_subfolders:
+        file_count_subfolder = subfolder_counts[subfolder_name]
+        print(f"\n{subfolder_name}:")
+        print(f"  Files: {file_count_subfolder}")
+        print(f"  Total Duration: {format_duration(total_duration_subfolder)}")
+        print(f"  Average Duration: {format_duration(total_duration_subfolder / file_count_subfolder)}")
+        
+        # # Show individual files in this subfolder
+        # if file_count_subfolder <= 10:  # Only show if 10 or fewer files
+        #     for file_path, duration in subfolder_files[subfolder_name]:
+        #         print(f"    {file_path.name}: {format_duration(duration)}")
+        # else:
+        #     print(f"    (showing first 5 files)")
+        #     for file_path, duration in subfolder_files[subfolder_name][:5]:
+        #         print(f"    {file_path.name}: {format_duration(duration)}")
+        #     print(f"    ... and {file_count_subfolder - 5} more files")
+    
+    # Display overall results
+    print("\n" + "=" * 50)
+    print("OVERALL SUMMARY")
     print("=" * 50)
     print(f"Total files processed: {len(mp4_files)}")
     print(f"Successful reads: {file_count}")
