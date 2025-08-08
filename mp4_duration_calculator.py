@@ -255,6 +255,41 @@ class _Tee:
         self.stream_b.flush()
 
 
+def _extract_summary_from_output(full_text: str) -> str:
+    """Return only the output from the 'SUBFOLDER SUMMARIES' section onward.
+
+    Falls back to 'OVERALL SUMMARY' if the first marker isn't found.
+    If neither is found, returns the original text.
+    """
+    lines = full_text.splitlines()
+    marker = "SUBFOLDER SUMMARIES"
+    idx = None
+
+    for i, line in enumerate(lines):
+        if line.strip() == marker:
+            idx = i
+            break
+
+    if idx is None:
+        alt_marker = "OVERALL SUMMARY"
+        for i, line in enumerate(lines):
+            if line.strip() == alt_marker:
+                idx = i
+                break
+
+    if idx is None:
+        return full_text
+
+    start = idx
+    if idx > 0 and set(lines[idx - 1].strip()) == {"="}:
+        start = idx - 1
+
+    summary_lines = lines[start:]
+    # Preserve trailing newline if present in original
+    trailing_newline = "\n" if full_text.endswith("\n") else ""
+    return "\n".join(summary_lines) + trailing_newline
+
+
 def main():
     """Main function to handle user input and run the duration calculation"""
     parser = argparse.ArgumentParser(description="Calculate total MP4 durations recursively.")
@@ -310,8 +345,10 @@ def main():
         filename = f"{safe_folder}_{timestamp}_{video_count}videos.txt"
         report_path = output_dir / filename
 
+        full_output = capture_buffer.getvalue()
+        summary_output = _extract_summary_from_output(full_output)
         with report_path.open("w", encoding="utf-8") as f:
-            f.write(capture_buffer.getvalue())
+            f.write(summary_output)
 
         print(f"\nSaved report to: {report_path}")
     else:
