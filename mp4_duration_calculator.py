@@ -13,6 +13,10 @@ from pathlib import Path
 from moviepy.editor import VideoFileClip
 import time
 from collections import defaultdict
+import argparse
+from datetime import datetime
+import io
+import contextlib
 
 
 def format_duration(seconds):
@@ -82,6 +86,14 @@ def find_mp4_files(folder_path):
             print(f"  Found: {relative_path}")
     
     return mp4_files
+
+
+def count_mp4_files_quiet(folder_path):
+    """Count MP4 files recursively without printing."""
+    folder = Path(folder_path)
+    if not folder.exists() or not folder.is_dir():
+        return 0
+    return sum(1 for _ in folder.rglob("*.mp4"))
 
 
 def calculate_subfolder_durations(folder_path, mp4_files):
@@ -180,8 +192,8 @@ def calculate_total_duration(folder_path):
         file_count_subfolder = subfolder_counts[subfolder_name]
         print(f"\n{subfolder_name}:")
         print(f"  Files: {file_count_subfolder}")
-        print(f"  Total Duration: {format_duration(total_duration_subfolder)}")
         print(f"  Average Duration: {format_duration(total_duration_subfolder / file_count_subfolder)}")
+        print(f"  Total Duration: {format_duration(total_duration_subfolder)}")
         
         # # Show individual files in this subfolder
         # if file_count_subfolder <= 10:  # Only show if 10 or fewer files
@@ -227,15 +239,41 @@ def calculate_total_duration(folder_path):
         print("No valid video durations found.")
 
 
+class _Tee:
+    """Duplicate writes to two streams."""
+
+    def __init__(self, stream_a, stream_b):
+        self.stream_a = stream_a
+        self.stream_b = stream_b
+
+    def write(self, data):
+        self.stream_a.write(data)
+        self.stream_b.write(data)
+
+    def flush(self):
+        self.stream_a.flush()
+        self.stream_b.flush()
+
+
 def main():
     """Main function to handle user input and run the duration calculation"""
+    parser = argparse.ArgumentParser(description="Calculate total MP4 durations recursively.")
+    parser.add_argument("folder", nargs="?", help="Folder path to search for MP4 files")
+    parser.add_argument("--save", action="store_true", help="Save the output to a text file")
+    parser.add_argument(
+        "--output-dir",
+        default="reports",
+        help="Directory to store text reports (created if missing). Relative to script directory by default.",
+    )
+    args = parser.parse_args()
+
     print("MP4 Duration Calculator")
     print("=" * 30)
     print()
-    
-    # Get folder path from user
-    if len(sys.argv) > 1:
-        folder_path = sys.argv[1]
+
+    # Get folder path from user or argument
+    if args.folder:
+        folder_path = args.folder
     else:
         folder_path = input("Enter the folder path to search for MP4 files: ").strip()
     
@@ -246,14 +284,40 @@ def main():
         print("No folder path provided. Exiting.")
         return
     
-    print()
-    
-    # Calculate total duration
     start_time = time.time()
-    calculate_total_duration(folder_path)
-    end_time = time.time()
-    
-    print(f"\nScript execution time: {end_time - start_time:.2f} seconds")
+
+    if args.save:
+        # Capture all output printed by calculate_total_duration
+        capture_buffer = io.StringIO()
+        tee_stream = _Tee(sys.stdout, capture_buffer)
+        with contextlib.redirect_stdout(tee_stream):
+            calculate_total_duration(folder_path)
+            end_time = time.time()
+            print(f"\nScript execution time: {end_time - start_time:.2f} seconds")
+
+        # Build output directory path relative to the script by default
+        script_dir = Path(__file__).resolve().parent
+        output_dir = Path(args.output_dir)
+        if not output_dir.is_absolute():
+            output_dir = script_dir / output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Compose filename: <folderName>_<YYYYMMDD-HHMMSS>_<N>videos.txt
+        analyzed_folder_name = Path(folder_path).resolve().name or "root"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        video_count = count_mp4_files_quiet(folder_path)
+        safe_folder = analyzed_folder_name.replace(" ", "_")
+        filename = f"{safe_folder}_{timestamp}_{video_count}videos.txt"
+        report_path = output_dir / filename
+
+        with report_path.open("w", encoding="utf-8") as f:
+            f.write(capture_buffer.getvalue())
+
+        print(f"\nSaved report to: {report_path}")
+    else:
+        calculate_total_duration(folder_path)
+        end_time = time.time()
+        print(f"\nScript execution time: {end_time - start_time:.2f} seconds")
 
 
 if __name__ == "__main__":

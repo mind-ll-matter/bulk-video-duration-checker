@@ -10,6 +10,7 @@ This Python script searches through all MP4 files in a specified folder and its 
 - Handles errors gracefully for corrupted or unreadable files
 - Shows progress during processing
 - Provides detailed summary statistics
+ - Optional: save the output to a timestamped text report
 
 ## Installation
 
@@ -40,6 +41,22 @@ Provide the folder path as a command line argument:
 
 ```bash
 venv\Scripts\python.exe mp4_duration_calculator.py "C:\Users\YourName\Videos"
+```
+
+#### Saving output to a text file
+
+Add `--save` to write the full console output to a text file in a central `reports` folder next to the script. The report filename includes the analyzed folder name, the date/time, and the number of videos found.
+
+```bash
+venv\Scripts\python.exe mp4_duration_calculator.py "C:\Users\YourName\Videos" --save
+# Example output file name:
+# reports/Videos_20250115-142233_87videos.txt
+```
+
+You can customize the reports directory with `--output-dir` (relative to the script directory by default):
+
+```bash
+venv\Scripts\python.exe mp4_duration_calculator.py "C:\Users\YourName\Videos" --save --output-dir my_reports
 ```
 
 ### Method 3: Using Activated Virtual Environment
